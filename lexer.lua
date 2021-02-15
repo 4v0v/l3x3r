@@ -1,8 +1,13 @@
+-- TODO: identifier like x["test"] -- prendre en compte x[' dfs df s @@@']
+-- TODO: increment lines
+-- TODO: unary operators: '& '>' etc
+
+
 local Lexer = {}
 
 function Lexer:new(file, filename)
 	local obj = {}
-	obj.current_line = 1
+	obj.current_line = 1 
 	obj.cursor_start = 1
 	obj.cursor_end   = 1
 	obj.tokens       = {}
@@ -47,14 +52,7 @@ function Lexer:split()
 
 	self.cursor_end   = self.cursor_end + 1
 	self.cursor_start = self.cursor_end
-
-
-	for i = 1, #token do
-		if token:sub(i, i) == "\t" then 
-			self.current_line = self.current_line + 1
-		end
-	end
-
+	--TODO: check if end of file
 	table.insert(self.tokens, token)
 	return token
 end
@@ -65,220 +63,221 @@ function Lexer:is_eof(x)
 	return (self.cursor_end + eof_length) > #self.file
 end
 
-
----
----
----
-
-function match_whitespace( char )
+function Lexer:match_whitespace( char )
 	return char:match( "[%s]" ) ~= nil
 end
 
-function match_all_except_newline( char )
+function Lexer:match_all_except_newline( char )
 	return char:match( "[^\n]" ) ~= nil
 end
 
-function match_identifier_start( char )
+function Lexer:match_identifier_start( char )
 	return char:match( "[%a_]" ) ~= nil
 end
 
-function match_identifier( char )
+function Lexer:match_identifier( char )
 	return char:match( "[%w_%.:]" ) ~= nil
 end
 
-function match_quote( char )
+function Lexer:match_quote( char )
 	return char:match( "['\"]" ) ~= nil
 end
 
-function match_number( char )
+function Lexer:match_number( char )
 	return char:match( "[0-9xXp%.i%-a-fA-F]" ) ~= nil
 end
 
-function match_decimal( char )
+function Lexer:match_decimal( char )
 	return char:match( "[0-9]" ) ~= nil
 end
 
-function do_while(input, func)
-	local current_char = input:peek()
-	if not current_char or not func(current_char) then return end
+function Lexer:do_while(func)
+	local current_char = self:peek()
+	if not current_char or not self[func](self, current_char) then return end
 
-	while not input:is_eof() and input:peek(2) and func(input:peek(2)) do
-		input:increment()
+	while not self:is_eof() and self:peek(2) and self[func](self, self:peek(2)) do
+		self:increment()
 	end
 	
-	return input:split()
+	return self:split()
 end
 
+function Lexer:tokenize_simple_strings()
+	local quote = self:peek()
 
--- TODO
-function tokenized_longstring()
-end
+	self:increment()
+	while true do
+		local chars = self:peek_chain(2)
 
--- TODO
-function tokenized_comment()
-end
+		if     chars == "\\\\"        then self:increment()
+		elseif chars == "\\" .. quote then self:increment(2) end
 
-local function tokenize(input)
-	do_while(input, match_whitespace)
-
-	--TODO: unary operators: '& '>' etc
-
-	local chars = input:peek_chain(3)
-	if     chars == "..=" then input:increment(3) return input:split()
-	elseif chars == "..." then input:increment(3) return input:split() end
-
-	local chars = input:peek_chain(2)
-	if     chars == "==" then input:increment(2) return input:split()
-	elseif chars == ">=" then input:increment(2) return input:split()
-	elseif chars == "<=" then input:increment(2) return input:split()
-	elseif chars == "+=" then input:increment(2) return input:split()
-	elseif chars == "-=" then input:increment(2) return input:split()
-	elseif chars == "!=" then input:increment(2) return input:split()
-	elseif chars == "~=" then input:increment(2) return input:split()
-	elseif chars == "*=" then input:increment(2) return input:split()
-	elseif chars == "/=" then input:increment(2) return input:split()
-	elseif chars == "==" then input:increment(2) return input:split()
-	elseif chars == "++" then input:increment(2) return input:split()
-	elseif chars == ".." then input:increment(2) return input:split()
-	elseif chars == "&&" then input:increment(2) return input:split()
-	elseif chars == "||" then input:increment(2) return input:split()
-	elseif chars == ">>" then input:increment(2) return input:split()
-	elseif chars == "<<" then input:increment(2) return input:split()
-	elseif chars == "::" then input:increment(2) return input:split() end
-
-	local char = input:peek()
-
-	if not char then return end
-
-	--identifiers
-	if match_identifier_start(char) then 
-		return do_while(input, match_identifier )
+		if self:peek() == quote  then return self:split()     end
+		if self:peek() == "\n"   then error("invalid string") end
+		if not self:increment()  then error("invalid string") end
 	end
+end
 
-	-- number
-	if match_decimal(char) then 
-		return do_while(input, match_number)
-	end
 
-	-- simple string
-	if match_quote( char ) then
-		input:increment()
+function Lexer:tokenized_long_strings()
+	local counter = 0
 
-		while true do
-			local chars = input:peek_chain(2)
-
-			if     chars == "\\\\"       then input:increment()
-			elseif chars == "\\" .. char then input:increment(2) end
-
-			if input:peek() == char  then return input:split()    end
-			if input:peek() == "\n"  then error("invalid string") end
-			if not input:increment() then error("invalid string") end
+	self:increment()
+	if self:peek() == "=" then
+		while true  do
+			if self:peek() == "=" then 
+				counter = counter + 1 
+				if not self:increment() then error("invalid long string") end
+			elseif self:peek() == "[" then 
+				break
+			else 
+				error( "invalid long string") 
+			end
 		end
 	end
 
-	-- longstrings
-	if char == "[" then
-		input:increment()
+	if self:peek() == "[" then
+		while true do
+			if self:is_eof() then error("invalid long string") end
+
+			self:increment()
+			if self:peek() == "]" then
+				for i = 1, counter do
+					self:increment()
+					if  self:peek() ~= "=" then goto continue_longstring_increment end
+				end
+
+				self:increment()
+				if self:peek() == "]" then return self:split() end
+				::continue_longstring_increment::
+			end
+		end
+	end
+end
+
+function Lexer:tokenized_comments()
+	self:increment(2)
+	
+	if self:peek() ~= "[" then
+		return self:do_while('match_all_except_newline')
+	else
+		self:increment()
 		
 		-- calculate longstring matching length: '[====[' == 4
 		local counter = 0
-		if input:peek() == "=" then
+		if self:peek() == "=" then
 			while true  do
-				if     input:peek() == "[" then 
-					break
-				elseif input:peek() == "=" then
+				if self:peek() == "=" then
 					counter = counter + 1
-					input:increment()
+					self:increment()
+				elseif self:peek() == "[" then 
+					break
 				else   
-					error( "invalid long string") 
+					return self:do_while('match_all_except_newline')
 				end
 			end
 		end
 
-		-- input:increment() 
-
-		-- beginning of longstring body
-		if input:peek() == "[" then
+		if self:peek() ~= "[" then
+			return self:do_while('match_all_except_newline')
+		else
+			-- beginning of longcomment body
 			while true do
-				if input:is_eof() then error("invalid long string") end
+				if self:is_eof() then error("invalid long comment") end
 
-				input:increment()
-				if input:peek() == "]" then
+				self:increment()
+				if self:peek() == "]" then
 					for i = 1, counter do
-						input:increment()
-						if  input:peek() ~= "=" then goto continue_longstring_increment end
+						self:increment()
+						if  self:peek() ~= "=" then goto continue_longcomment_increment end
 					end
 
-					input:increment()
-					if input:peek() == "]" then return input:split() end
-					::continue_longstring_increment::
-				end
-			end
-		else
-			-- TODO: identifier like x["test"]
-			-- prendre en compte x[' dfs df s @@@']
-		end
-	end
-
-	-- comments
-	local chars = input:peek_chain(2)
-
-	if chars == "--" then
-		input:increment(2)
-	
-		if input:peek() ~= "[" then
-			return do_while(input, match_all_except_newline)
-		else
-			input:increment()
-			
-			-- calculate longstring matching length: '[====[' == 4
-			local counter = 0
-			if input:peek() == "=" then
-				while true  do
-					if     input:peek() == "[" then 
-						break
-					elseif input:peek() == "=" then
-						counter = counter + 1
-						input:increment()
-					else   
-						return do_while(input, match_all_except_newline)
-					end
-				end
-			end
-
-			if input:peek() ~= "[" then
-				return do_while(input, match_all_except_newline)
-			else
-				-- beginning of longcomment body
-				while true do
-					if input:is_eof() then error("invalid long comment") end
-
-					input:increment()
-					if input:peek() == "]" then
-						for i = 1, counter do
-							input:increment()
-							if  input:peek() ~= "=" then goto continue_longcomment_increment end
-						end
-
-						input:increment()
-						if input:peek() == "]" then return input:split() end
-						::continue_longcomment_increment::
-					end
+					self:increment()
+					if self:peek() == "]" then return self:split() end
+					::continue_longcomment_increment::
 				end
 			end
 		end
 	end
-
-	-- if nothing match, one char is returned
-	return input:split()
 end
 
-function lexer(file, filename)
+function Lexer:tokenize()
+	local char = self:peek()
 
+	if not char then return end
+
+	-- whitespace
+	if self:match_whitespace(char) then
+		return self:do_while('match_whitespace')
+	end
+
+	-- identifiers
+	if self:match_identifier_start(char) then 
+		return self:do_while('match_identifier')
+	end
+
+	-- numbers
+	if self:match_decimal(char) or (char == "." and self:match_decimal(self:peek(2))) then 
+		return self:do_while('match_number')
+	end
+
+	-- simple strings
+	if self:match_quote( char ) then
+		return self:tokenize_simple_strings()
+	end
+
+	-- long strings
+	if self:peek(2) == "[[" or self:peek(2) == "[=" then
+		return self:tokenized_long_strings()
+	end
+
+	-- simple && long comments
+	if self:peek_chain(2) == "--" then
+		return self:tokenized_comments()
+	end
+
+	-- symbols
+	local chars = self:peek_chain(3)
+	if chars == "..=" or
+	 	chars == "..." 
+	then 
+		self:increment(3) 
+		return self:split() 
+	end
+
+	local chars = self:peek_chain(2)
+	if chars == "==" or
+		chars == ">=" or
+		chars == "<=" or
+		chars == "+=" or
+		chars == "-=" or
+		chars == "!=" or
+		chars == "~=" or
+		chars == "*=" or
+		chars == "/=" or
+		chars == "==" or
+		chars == "++" or
+		chars == ".." or
+		chars == "&&" or
+		chars == "||" or
+		chars == ">>" or
+		chars == "<<" or
+		chars == "::"
+	then
+		self:increment(2) 
+		return self:split() 
+	end
+	
+	-- if nothing match, one char is returned
+	return self:split()
+end
+
+
+return function(file, filename)
 	local input = Lexer:new(file, filename)
 
 	while not input:is_eof() do
-		tokenize(input)
+		input:tokenize()
 	end
 
 	return input.tokens
