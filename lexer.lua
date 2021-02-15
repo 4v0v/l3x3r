@@ -243,7 +243,7 @@ function Lexer:tokenize_whitespace()
 	while self:match_whitespace(self:peek(2)) do
 		self:increment()
 	end
-	return self:split('\\ws')
+	return self:split('\\w')
 end
 
 function Lexer:tokenize_number()
@@ -343,7 +343,7 @@ end
 function Lexer:split(type)
 	local token = self.file:sub(self.cursor_start, self.cursor_end)
 
-	self.cursor_end   = self.cursor_end + 1
+	self:increment()
 	self.cursor_start = self.cursor_end
 	
 	table.insert(self.tokens, {type = type, token = token})
