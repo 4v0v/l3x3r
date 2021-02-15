@@ -1,7 +1,6 @@
 local Lexer = {}
 
 function Lexer:new(file)
-	self.current_line = 1 
 	self.cursor_start = 1
 	self.cursor_end   = 1
 	self.tokens       = {}
