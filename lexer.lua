@@ -2,17 +2,15 @@
 -- TODO: increment lines
 -- TODO: unary operators: '& '>' etc
 
-
 local Lexer = {}
 
-function Lexer:new(file, filename)
+function Lexer:new(file)
 	local obj = {}
 	obj.current_line = 1 
 	obj.cursor_start = 1
 	obj.cursor_end   = 1
 	obj.tokens       = {}
 	obj.file         = file
-	obj.filename     = filename
 	return setmetatable(obj, {__index = Lexer})
 end
 
@@ -47,13 +45,13 @@ function Lexer:increment(x)
 	return not self:is_eof(x)
 end
 
-function Lexer:split()
+function Lexer:split(type)
 	local token = self.file:sub(self.cursor_start, self.cursor_end)
 
 	self.cursor_end   = self.cursor_end + 1
 	self.cursor_start = self.cursor_end
 	--TODO: check if end of file
-	table.insert(self.tokens, token)
+	table.insert(self.tokens, {type = type or "_", token = token})
 	return token
 end
 
@@ -91,7 +89,7 @@ function Lexer:match_decimal( char )
 	return char:match( "[0-9]" ) ~= nil
 end
 
-function Lexer:do_while(func)
+function Lexer:do_while(func, type)
 	local current_char = self:peek()
 	if not current_char or not self[func](self, current_char) then return end
 
@@ -99,7 +97,7 @@ function Lexer:do_while(func)
 		self:increment()
 	end
 	
-	return self:split()
+	return self:split(type)
 end
 
 function Lexer:tokenize_simple_strings()
@@ -109,12 +107,13 @@ function Lexer:tokenize_simple_strings()
 	while true do
 		local chars = self:peek_chain(2)
 
-		if     chars == "\\\\"        then self:increment()
-		elseif chars == "\\" .. quote then self:increment(2) end
+		if     chars == "\\\\"        then print('test') self:increment()
+		elseif chars == "\\" .. quote then print('test') self:increment(2) end
 
-		if self:peek() == quote  then return self:split()     end
-		if self:peek() == "\n"   then error("invalid string") end
-		if not self:increment()  then error("invalid string") end
+		if self:peek() == quote  then return self:split("s_string") end
+		if self:peek() == "\n"   then error("invalid short string") end
+		if not self:increment()  then error("oef short string ") end
+
 	end
 end
 
@@ -148,7 +147,7 @@ function Lexer:tokenized_long_strings()
 				end
 
 				self:increment()
-				if self:peek() == "]" then return self:split() end
+				if self:peek() == "]" then return self:split("l_string") end
 				::continue_longstring_increment::
 			end
 		end
@@ -159,7 +158,7 @@ function Lexer:tokenized_comments()
 	self:increment(2)
 	
 	if self:peek() ~= "[" then
-		return self:do_while('match_all_except_newline')
+		return self:do_while('match_all_except_newline', 's_comment')
 	else
 		self:increment()
 		
@@ -173,13 +172,13 @@ function Lexer:tokenized_comments()
 				elseif self:peek() == "[" then 
 					break
 				else   
-					return self:do_while('match_all_except_newline')
+					return self:do_while('match_all_except_newline', 's_comment')
 				end
 			end
 		end
 
 		if self:peek() ~= "[" then
-			return self:do_while('match_all_except_newline')
+			return self:do_while('match_all_except_newline', 's_comment')
 		else
 			-- beginning of longcomment body
 			while true do
@@ -193,7 +192,7 @@ function Lexer:tokenized_comments()
 					end
 
 					self:increment()
-					if self:peek() == "]" then return self:split() end
+					if self:peek() == "]" then return self:split("l_comment") end
 					::continue_longcomment_increment::
 				end
 			end
@@ -208,17 +207,17 @@ function Lexer:tokenize()
 
 	-- whitespace
 	if self:match_whitespace(char) then
-		return self:do_while('match_whitespace')
+		return self:do_while('match_whitespace', 'whitespace')
 	end
 
 	-- identifiers
 	if self:match_identifier_start(char) then 
-		return self:do_while('match_identifier')
+		return self:do_while('match_identifier', 'identifier')
 	end
 
 	-- numbers
 	if self:match_decimal(char) or (char == "." and self:match_decimal(self:peek(2))) then 
-		return self:do_while('match_number')
+		return self:do_while('match_number', 'number')
 	end
 
 	-- simple strings
@@ -237,44 +236,51 @@ function Lexer:tokenize()
 	end
 
 	-- symbols
-	local chars = self:peek_chain(3)
-	if chars == "..=" or
-	 	chars == "..." 
-	then 
-		self:increment(3) 
-		return self:split() 
-	end
 
-	local chars = self:peek_chain(2)
-	if chars == "==" or
-		chars == ">=" or
-		chars == "<=" or
-		chars == "+=" or
-		chars == "-=" or
-		chars == "!=" or
-		chars == "~=" or
-		chars == "*=" or
-		chars == "/=" or
-		chars == "==" or
-		chars == "++" or
-		chars == ".." or
-		chars == "&&" or
-		chars == "||" or
-		chars == ">>" or
-		chars == "<<" or
-		chars == "::"
-	then
-		self:increment(2) 
-		return self:split() 
-	end
+	local two_chars   = self:peek_chain(2)
+	local three_chars = self:peek_chain(3)
+
+	if three_chars == "..=" then self:increment(2) return self:split("CONCAT_EQ")   end
+	if three_chars == "..." then self:increment(2) return self:split("ARGS")        end
+	if two_chars   == "=="  then self:increment()  return self:split("EQUAL_OP")    end
+	if two_chars   == ">="  then self:increment()  return self:split("GREAT_EQ_OP") end
+	if two_chars   == "<="  then self:increment()  return self:split("LESS_EQ_OP")  end
+	if two_chars   == "+="  then self:increment()  return self:split("PLUS_EQ")     end
+	if two_chars   == "-="  then self:increment()  return self:split("MINUS_EQ")    end
+	if two_chars   == "!="  then self:increment()  return self:split("DIF_EQ!")     end
+	if two_chars   == "~="  then self:increment()  return self:split("DIF_EQ~")     end
+	if two_chars   == "*="  then self:increment()  return self:split("TIME_EQ")     end
+	if two_chars   == "/="  then self:increment()  return self:split("DIV_EQ")      end
+	if two_chars   == "%="  then self:increment()  return self:split("MOD_EQ")      end
+	if two_chars   == "++"  then self:increment()  return self:split("INCREMENT")   end
+	if two_chars   == '..'  then self:increment()  return self:split("CONCAT_STR")  end
+	if two_chars   == "&&"  then self:increment()  return self:split("AND&&") 		  end
+	if two_chars   == "||"  then self:increment()  return self:split("OR||") 		  end
+	if two_chars   == ">>"  then self:increment()  return self:split("BITWISE_>>")  end
+	if two_chars   == "<<"  then self:increment()  return self:split("BITWISE_<<")  end
+	if two_chars   == "::"  then self:increment()  return self:split("GOTO::") 	  end
+	if char        == '['   then                   return self:split("L_BRACKET")   end
+	if char        == ']'   then                   return self:split("R_BRACKET")   end
+	if char        == '('   then                   return self:split("L_PARENT")    end
+	if char        == ')'   then                   return self:split("R_PARENT")    end
+	if char        == '{'   then                   return self:split("L_CURLY")     end
+	if char        == '}'   then                   return self:split("R_CURLY")     end
+	if char        == '>'   then                   return self:split("LESS")        end
+	if char        == '<'   then                   return self:split("GREATER")     end
+	if char        == '='   then                   return self:split("EQUAL")       end
+	if char        == '%'   then                   return self:split("MODULO")      end
+	if char        == '@'   then                   return self:split("SELF@")       end
+	if char        == '!'   then                   return self:split("NOT!")        end
+	if char        == ';'   then                   return self:split("SEMICOLON")   end
+	if char        == ','   then                   return self:split("COMMA")       end
 	
 	-- if nothing match, one char is returned
-	return self:split()
+	return self:split("undefined")
 end
 
 
-return function(file, filename)
-	local input = Lexer:new(file, filename)
+return function(file)
+	local input = Lexer:new(file)
 
 	while not input:is_eof() do
 		input:tokenize()
