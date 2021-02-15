@@ -52,12 +52,12 @@ function Lexer:split()
 	for i = 1, #token do
 		if token:sub(i, i) == "\t" then 
 			self.current_line = self.current_line + 1
+		end
 	end
 
 	table.insert(self.tokens, token)
 	return token
 end
-
 
 function Lexer:is_eof(x)
 	local eof_length = 0
@@ -72,6 +72,10 @@ end
 
 function match_whitespace( char )
 	return char:match( "[%s]" ) ~= nil
+end
+
+function match_all_except_newline( char )
+	return char:match( "[^\n]" ) ~= nil
 end
 
 function match_identifier_start( char )
@@ -144,6 +148,8 @@ local function tokenize(input)
 
 	local char = input:peek()
 
+	if not char then return end
+
 	--identifiers
 	if match_identifier_start(char) then 
 		return do_while(input, match_identifier )
@@ -189,17 +195,16 @@ local function tokenize(input)
 			end
 		end
 
-		input:increment() 
+		-- input:increment() 
 
 		-- beginning of longstring body
 		if input:peek() == "[" then
 			while true do
 				if input:is_eof() then error("invalid long string") end
 
-				if input:peek() ~= "]" then
-					input:increment()
-				else
-					for i = 0, counter do
+				input:increment()
+				if input:peek() == "]" then
+					for i = 1, counter do
 						input:increment()
 						if  input:peek() ~= "=" then goto continue_longstring_increment end
 					end
@@ -216,72 +221,52 @@ local function tokenize(input)
 	end
 
 	-- comments
-	if char == "-" then
-		local last = input:increment()
-		char = input:peek()
-		local long = 0
-		if char == "-" then
+	local chars = input:peek_chain(2)
+
+	if chars == "--" then
+		input:increment(2)
+	
+		if input:peek() ~= "[" then
+			return do_while(input, match_all_except_newline)
+		else
 			input:increment()
-
-			--long comment
-			if input:peek() == "[" then
-				input:increment()
-				if input:peek() == "=" then
-					while not input:is_eof() do
-						if input:peek() == "[" then
-							break
-						elseif input:peek() == "=" then
-							input:increment()
-							long = long + 1
-						else
-							error( "<"..toks.filename().."> long comment start not found.", 0 )
-						end
-					end
-				end
-				if input:peek() == "[" then
-					while not input:is_eof() do
-						local char = input:increment()
-						if char == "]" then
-							if input:peek() == "=" then
-								for i=1, long do
-									if input:peek() == "=" then
-										input:increment()
-									else
-										error( "<"..toks.filename().."> long comment end not found.", 0 )
-									end
-								end
-								long = 0
-							end
-							if input:peek() == "]" then
-								input:increment()
-								if long == 0 then
-									break
-								end
-							end
-						end
-					end
-
-				-- short comment
-				else
-					while not input:is_eof() do
-						local char = input:increment()
-						if char:match( "[\n\r]" ) ~= nil then
-							break
-						end
-					end
-				end
-				return ""
-			else
-				while not input:is_eof() do
-					local char = input:increment()
-					if char:match( "[\n\r]" ) ~= nil then
+			
+			-- calculate longstring matching length: '[====[' == 4
+			local counter = 0
+			if input:peek() == "=" then
+				while true  do
+					if     input:peek() == "[" then 
 						break
+					elseif input:peek() == "=" then
+						counter = counter + 1
+						input:increment()
+					else   
+						return do_while(input, match_all_except_newline)
 					end
 				end
-				return ""
+			end
+
+			if input:peek() ~= "[" then
+				return do_while(input, match_all_except_newline)
+			else
+				-- beginning of longcomment body
+				while true do
+					if input:is_eof() then error("invalid long comment") end
+
+					input:increment()
+					if input:peek() == "]" then
+						for i = 1, counter do
+							input:increment()
+							if  input:peek() ~= "=" then goto continue_longcomment_increment end
+						end
+
+						input:increment()
+						if input:peek() == "]" then return input:split() end
+						::continue_longcomment_increment::
+					end
+				end
 			end
 		end
-		return last
 	end
 
 	-- if nothing match, one char is returned
