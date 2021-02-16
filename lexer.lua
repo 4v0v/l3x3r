@@ -1,277 +1,317 @@
 local Lexer = {}
 
-function Lexer:new(file)
+function Lexer:tokenize(file)
+	self.file         = file
 	self.cursor_start = 1
 	self.cursor_end   = 1
 	self.tokens       = {}
-	self.file         = file
-end
-
-function Lexer:tokenize(file)
-	self:new(file)
 
 	while not self:eof() do
-		self:tokenize_next_element()
+		if     self:try_tokenize_whitespace()    then 
+		elseif self:try_tokenize_identifier()    then -- contains keywords tokenization
+		elseif self:try_tokenize_number()        then 
+		elseif self:try_tokenize_short_string()  then 
+		elseif self:try_tokenize_long_string()   then 
+		elseif self:try_tokenize_short_comment() then
+		elseif self:try_tokenize_long_comment()  then -- contains a case of short comment
+		elseif self:try_tokenize_label()         then 
+		elseif self:try_tokenize_symbol()        then
+		else   self:split('???')                 end  -- if nothing match, one char is returned as the token
 	end
 
 	return self.tokens
 end
 
-function Lexer:tokenize_next_element()
-	if not self:peek() then return end
-	
-	local peek_1  = self:peek()
-	local peek_2  = self:peek(2)
-	local peek_3  = self:peek(3)
-	local peek_4  = self:peek(4)
-	local chain_2 = self:peek_chain(2)
-	local chain_3 = self:peek_chain(3)
-
-	-- whitespace
-	if self:match_whitespace(peek_1) then 
-		return self:tokenize_whitespace()
-
-	-- identifier && keyword
-	elseif self:match_identifier_start(peek_1) then 
-		return self:tokenize_keyword_or_identifier()
-
-	-- number
-	elseif self:match_decimal(peek_1) or (peek_1 == '.' and self:match_decimal(peek_2)) then 
-		return self:tokenize_number()
-
-	-- simple string
-	elseif self:match_quote(peek_1) then 
-		return self:tokenize_simple_string()
-
-	-- long string
-	elseif chain_2 == '[[' or chain_2 == '[=' then 
-		return self:tokenize_long_string()
-
-	-- simple comment 
-	elseif (chain_2 == '--' and peek_3 ~= '[') or (chain_3 == '--[' and peek_4 ~= '[' and peek_4 ~= '=') then
-		return self:tokenize_short_comment()
-
-	-- long comment && one case of simple comment
-	elseif chain_3 == '--[' and (peek_4 == '[' or peek_4 == '=') then 
-		return self:tokenize_simple_or_long_comment()
-
-	elseif chain_2 == '::' and self:match_identifier_start(peek_3) then 
-		return self:tokenize_label()
-
-	-- symbol
-	elseif chain_3 == '...' then self:increment(2) return self:split('...')
-	elseif chain_3 == '..=' then self:increment(2) return self:split('..=') -- custom
-	elseif chain_2 == '=='  then self:increment()  return self:split('==')
-	elseif chain_2 == '>='  then self:increment()  return self:split('>=')	
-	elseif chain_2 == '<='  then self:increment()  return self:split('<=')
-	elseif chain_2 == '~='  then self:increment()  return self:split('~=')
-	elseif chain_2 == '..'  then self:increment()  return self:split('..')
-	elseif chain_2 == '>>'  then self:increment()  return self:split('>>')
-	elseif chain_2 == '<<'  then self:increment()  return self:split('<<')
-	elseif chain_2 == '::'  then self:increment()  return self:split('::')
-	elseif chain_2 == '+='  then self:increment()  return self:split('+=') -- custom
-	elseif chain_2 == '-='  then self:increment()  return self:split('-=') -- custom
-	elseif chain_2 == '!='  then self:increment()  return self:split('!=') -- custom
-	elseif chain_2 == '*='  then self:increment()  return self:split('*=') -- custom
-	elseif chain_2 == '/='  then self:increment()  return self:split('/=') -- custom
-	elseif chain_2 == '%='  then self:increment()  return self:split('%=') -- custom
-	elseif chain_2 == '++'  then self:increment()  return self:split('++') -- custom
-	elseif chain_2 == '&&'  then self:increment()  return self:split('&&') -- custom
-	elseif chain_2 == '||'  then self:increment()  return self:split('||') -- custom
-	elseif peek_1  == '['   then                   return self:split('[')
-	elseif peek_1  == ']'   then                   return self:split(']')
-	elseif peek_1  == '('   then                   return self:split('(')
-	elseif peek_1  == ')'   then                   return self:split(')')
-	elseif peek_1  == '{'   then                   return self:split('{')
-	elseif peek_1  == '}'   then                   return self:split('}')
-	elseif peek_1  == '>'   then                   return self:split('>')
-	elseif peek_1  == '<'   then                   return self:split('<')
-	elseif peek_1  == '='   then                   return self:split('=')
-	elseif peek_1  == '%'   then                   return self:split('%')
-	elseif peek_1  == '?'   then                   return self:split('?')
-	elseif peek_1  == ':'   then                   return self:split(':')
-	elseif peek_1  == ';'   then                   return self:split(';')
-	elseif peek_1  == ','   then                   return self:split(',')
-	elseif peek_1  == '+'   then                   return self:split('+')
-	elseif peek_1  == '-'   then                   return self:split('-')
-	elseif peek_1  == '*'   then                   return self:split('*')
-	elseif peek_1  == '/'   then                   return self:split('/')
-	elseif peek_1  == '^'   then                   return self:split('^')
-	elseif peek_1  == '#'   then                   return self:split('#')
-	elseif peek_1  == '&'   then                   return self:split('&')
-	elseif peek_1  == '.'   then                   return self:split('.')
-	elseif peek_1  == '\n'  then                   return self:split('\\n')
-	elseif peek_1  == '\r'  then                   return self:split('\\r')        
-	elseif peek_1  == '@'   then                   return self:split('@') -- custom
-	elseif peek_1  == '!'   then                   return self:split('!') -- custom
-
-	-- if nothing match, one char is returned
-	else
-		return self:split('???')
+function Lexer:try_tokenize_short_string()
+	if not self:match_quote(self:peek()) then 
+		return false 
 	end
-end
 
-function Lexer:tokenize_simple_string()
 	local quote = self:peek()
 
 	self:increment()
+
 	while true do
 		local chars = self:peek_chain(2)
 		if     chars == [[\\]]         then self:increment()
-		elseif chars == [[\]] .. quote then self:increment(2) end
+		elseif chars == [[\]] .. quote then self:increment() self:increment() end
 
-		if self:peek() == quote  then return self:split('S_STRING') end
-		if self:peek() == '\n'   then error('invalid short string') end
-		if not self:increment()  then error('oef short string ')    end
+		if self:peek(quote) then 
+			self:split('S_STRING') 
+			return true 
+		end
+
+		self:increment()
+
+		if self:eof() or self:peek('\n') then 
+			error('can\'t find end of short string')
+		end
 	end
 end
 
-function Lexer:tokenize_keyword_or_identifier()
+function Lexer:try_tokenize_identifier()
+	if not self:match_identifier_start(self:peek()) then 
+		return false
+	end
+
 	while self:match_identifier(self:peek(2)) do
 		self:increment()
 	end
 
 	local token = self:get_current_token()
-	-- default lua keywords
-	if token == 'if'       then return self:split('IF')		 end
-	if	token == 'then'     then return self:split('THEN')		 end
-	if	token == 'else'     then return self:split('ELSE')		 end
-	if	token == 'elseif'   then return self:split('ELSEIF')	 end
-	if	token == 'end'      then return self:split('END')		 end
-	if	token == 'do'       then return self:split('DO')		 end
-	if	token == 'for'      then return self:split('FOR')		 end
-	if	token == 'function' then return self:split('FUNCTION') end
-	if	token == 'repeat'   then return self:split('REPEAT')	 end
-	if	token == 'until'    then return self:split('UNTIL')	 end
-	if	token == 'while'    then return self:split('WHILE')	 end
-	if	token == 'break'    then return self:split('BREAK')	 end
-	if	token == 'return'   then return self:split('RETURN')	 end
-	if	token == 'local'    then return self:split('LOCAL')	 end
-	if	token == 'in'       then return self:split('IN')		 end
-	if	token == 'not'      then return self:split('NOT')		 end
-	if	token == 'and'      then return self:split('AND')		 end
-	if	token == 'or'       then return self:split('OR')		 end
-	if	token == 'goto'     then return self:split('GOTO')		 end
-	if	token == 'self'     then return self:split('SELF')		 end
-	if	token == 'true'     then return self:split('TRUE')		 end
-	if	token == 'false'    then return self:split('FALSE')	 end
-	if	token == 'nil'      then return self:split('NIL')		 end
+	if token == 'if'       then self:split('IF')       return true end
+	if	token == 'then'     then self:split('THEN')     return true end
+	if	token == 'else'     then self:split('ELSE')     return true end
+	if	token == 'elseif'   then self:split('ELSEIF')   return true end
+	if	token == 'end'      then self:split('END')      return true end
+	if	token == 'do'       then self:split('DO')       return true end
+	if	token == 'for'      then self:split('FOR')      return true end
+	if	token == 'function' then self:split('FUNCTION') return true end
+	if	token == 'repeat'   then self:split('REPEAT')   return true end
+	if	token == 'until'    then self:split('UNTIL')    return true end
+	if	token == 'while'    then self:split('WHILE')    return true end
+	if	token == 'break'    then self:split('BREAK')    return true end
+	if	token == 'return'   then self:split('RETURN')   return true end
+	if	token == 'local'    then self:split('LOCAL')    return true end
+	if	token == 'in'       then self:split('IN')       return true end
+	if	token == 'not'      then self:split('NOT')      return true end
+	if	token == 'and'      then self:split('AND')      return true end
+	if	token == 'or'       then self:split('OR')       return true end
+	if	token == 'goto'     then self:split('GOTO')     return true end
+	if	token == 'self'     then self:split('SELF')     return true end
+	if	token == 'true'     then self:split('TRUE')     return true end
+	if	token == 'false'    then self:split('FALSE')    return true end
+	if	token == 'nil'      then self:split('NIL')      return true end
+	if	token == 'fn'       then self:split('FN')       return true end -- custom
+	if	token == 'ifor'     then self:split('IFOR')     return true end -- custom
+	if	token == 'rfor'     then self:split('RFOR')     return true end -- custom
+	if	token == 'elif'     then self:split('ELIF')     return true end -- custom
+	if	token == 'switch'   then self:split('SWITCH')   return true end -- custom
+	if	token == 'case'     then self:split('CASE')     return true end -- custom
+	if	token == 'continue' then self:split('CONTINUE') return true end -- custom
+	if	token == 'through'  then self:split('THROUGH')  return true end -- custom
 
-	if	token == 'fn'       then return self:split('FN')		 end -- custom
-	if	token == 'ifor'     then return self:split('IFOR')		 end -- custom
-	if	token == 'rfor'     then return self:split('RFOR')		 end -- custom
-	if	token == 'elif'     then return self:split('ELIF')		 end -- custom
-	if	token == 'switch'   then return self:split('SWITCH')	 end -- custom
-	if	token == 'case'     then return self:split('CASE')		 end -- custom
-	
-	return self:split('IDENTIFIER')
+	self:split('IDENTIFIER')
+	return true
 end
 
-function Lexer:tokenize_long_string()
-	local counter = 0
+function Lexer:try_tokenize_symbol()
+	local peek_1  = self:peek()
+	local chain_2 = self:peek_chain(2)
+	local chain_3 = self:peek_chain(3)
 
+	if chain_3 == '...' then self:increment() self:increment() self:split('...') return true end
+	if chain_3 == '..=' then self:increment() self:increment() self:split('..=') return true end -- custom
+	if chain_2 == '=='  then self:increment() self:split('==') return true end
+	if chain_2 == '>='  then self:increment() self:split('>=') return true end
+	if chain_2 == '<='  then self:increment() self:split('<=') return true end
+	if chain_2 == '~='  then self:increment() self:split('~=') return true end
+	if chain_2 == '..'  then self:increment() self:split('..') return true end
+	if chain_2 == '>>'  then self:increment() self:split('>>') return true end
+	if chain_2 == '<<'  then self:increment() self:split('<<') return true end
+	if chain_2 == '::'  then self:increment() self:split('::') return true end
+	if chain_2 == '+='  then self:increment() self:split('+=') return true end -- custom
+	if chain_2 == '-='  then self:increment() self:split('-=') return true end -- custom
+	if chain_2 == '!='  then self:increment() self:split('!=') return true end -- custom
+	if chain_2 == '*='  then self:increment() self:split('*=') return true end -- custom
+	if chain_2 == '/='  then self:increment() self:split('/=') return true end -- custom
+	if chain_2 == '%='  then self:increment() self:split('%=') return true end -- custom
+	if chain_2 == '++'  then self:increment() self:split('++') return true end -- custom
+	if chain_2 == '&&'  then self:increment() self:split('&&') return true end -- custom
+	if chain_2 == '||'  then self:increment() self:split('||') return true end -- custom
+	if peek_1  == '['   then self:split('[')    return true end
+	if peek_1  == ']'   then self:split(']')    return true end
+	if peek_1  == '('   then self:split('(')    return true end
+	if peek_1  == ')'   then self:split(')')    return true end
+	if peek_1  == '{'   then self:split('{')    return true end
+	if peek_1  == '}'   then self:split('}')    return true end
+	if peek_1  == '>'   then self:split('>')    return true end
+	if peek_1  == '<'   then self:split('<')    return true end
+	if peek_1  == '='   then self:split('=')    return true end
+	if peek_1  == '%'   then self:split('%')    return true end
+	if peek_1  == '?'   then self:split('?')    return true end
+	if peek_1  == ':'   then self:split(':')    return true end
+	if peek_1  == ';'   then self:split(';')    return true end
+	if peek_1  == ','   then self:split(',')    return true end
+	if peek_1  == '+'   then self:split('+')    return true end
+	if peek_1  == '-'   then self:split('-')    return true end
+	if peek_1  == '*'   then self:split('*')    return true end
+	if peek_1  == '/'   then self:split('/')    return true end
+	if peek_1  == '^'   then self:split('^')    return true end
+	if peek_1  == '#'   then self:split('#')    return true end
+	if peek_1  == '&'   then self:split('&')    return true end
+	if peek_1  == '.'   then self:split('.')    return true end
+	if peek_1  == '\n'  then self:split('eol')  return true end
+	if peek_1  == '\r'  then self:split('eolr') return true end       
+	if peek_1  == '@'   then self:split('@')    return true end -- custom
+	if peek_1  == '!'   then self:split('!')    return true end -- custom
+	
+	return false 
+end
+
+function Lexer:try_tokenize_long_string()
+	if self:peek_chain(2) ~= '[[' and self:peek_chain(2) ~= '[=' then
+		return false
+	end
+
+	-- skip '[' 
 	self:increment()
-	if self:peek() == '=' then
-		while true  do
-			if self:peek() == '=' then 
+
+	-- count '='
+	local counter = 0
+	if self:peek('=') then
+		while true do
+			if self:peek('=') then 
 				counter = counter + 1 
-				if not self:increment() then error('invalid long string') end
-			elseif self:peek() == '[' then 
+				self:increment()
+				if self:eof() then error('can\'t find long string end') end
+			elseif self:peek('[') then 
 				break
 			else 
-				error( 'invalid long string') 
-			end
-		end
-	end
-
-	if self:peek() == '[' then
-		while true do
-			if self:eof() then error('invalid long string') end
-
-			self:increment()
-			if self:peek() == ']' then
-				for i = 1, counter do
-					self:increment()
-					if  self:peek() ~= '=' then goto continue_longstring_increment end
-				end
-
-				self:increment()
-				if self:peek() == ']' then return self:split('LONG_STRING') end
-				::continue_longstring_increment::
-			end
-		end
-	end
-end
-
-function Lexer:tokenize_simple_or_long_comment()
-	self:increment(3)
-	
-	local counter = 0
-	if self:peek() == '=' then
-		while true  do
-			if self:peek() == '=' then
-				counter = counter + 1
-				self:increment()
-			elseif self:peek() == '[' then 
-				break
-			else   
-				return self:tokenize_short_comment()
+				error('incorrect syntax on long string declaration') 
 			end
 		end
 	end
 
 	while true do
-		if self:eof() then error('invalid long comment') end
+		if self:eof() then error('can\'t find long string end') end
 
 		self:increment()
-		if self:peek() == ']' then
+
+		if self:peek(']') then
 			for i = 1, counter do
 				self:increment()
-				if  self:peek() ~= '=' then 
-					goto continue_long_comment_tokenization 
-				end
+				if not self:peek('=') then goto continue_tokenization end
 			end
 
 			self:increment()
-			if self:peek() == ']' then return self:split('LONG_COMMENT') end
-			::continue_long_comment_tokenization::
+
+			if self:peek(']') then 
+				self:split('LONG_STRING') 
+				return true
+			end
+
+			::continue_tokenization::
 		end
 	end
 end
 
-function Lexer:tokenize_whitespace()
+function Lexer:try_tokenize_long_comment()
+   if self:peek_chain(3) ~= '--[' or (self:peek(4) ~= '[' and self:peek(4) ~= '=') then
+		return false
+	end
+
+	-- skip '--['
+	self:increment()
+	self:increment()
+	self:increment()
+	
+	-- count '='
+	local counter = 0
+	if self:peek('=') then
+		while true  do
+			if self:peek('=')  then
+				counter = counter + 1
+				self:increment()
+			elseif self:peek('[') then 
+				break
+			else 
+				-- it's a short comment
+				while self:match_all_except_newline(self:peek(2)) do
+					self:increment()
+				end
+
+				self:split('SHORT_COMMENT') 
+				return true
+			end
+		end
+	end
+
+	-- tokenize until end of comment
+	while true do
+		if self:eof() then error('invalid long comment') end
+
+		self:increment()
+
+		if self:peek(']') then
+			for i = 1, counter do
+				self:increment()
+				if not self:peek('=') then goto continue_tokenization end
+			end
+
+			self:increment()
+
+			if self:peek(']') then 
+				self:split('LONG_COMMENT') 
+				return true 
+			end
+
+			::continue_tokenization::
+		end
+	end
+end
+
+function Lexer:try_tokenize_whitespace()
+	if not self:match_whitespace(self:peek()) then 
+		return false 
+	end
+
 	while self:match_whitespace(self:peek(2)) do
 		self:increment()
 	end
-	return self:split('\\w')
+
+	self:split('wsp')
+	return true
 end
 
-function Lexer:tokenize_number()
+function Lexer:try_tokenize_number()
+	if not self:match_decimal(self:peek()) and 
+		not (self:peek() == '.' and self:match_decimal(self:peek(2))) 
+	then
+		return false
+	end
+
 	while self:match_number(self:peek(2)) do
 		self:increment()
 	end
-	return self:split('NUMBER')
+
+	self:split('NUMBER')
+	return true
 end
 
-function Lexer:tokenize_short_comment()
+function Lexer:try_tokenize_short_comment()
+	if not (self:peek_chain(2) == '--'  and self:peek(3) ~= '[') and 
+		not (self:peek_chain(3) == '--[' and self:peek(4) ~= '[' and self:peek(4) ~= '=')
+	then
+		return false
+	end
+
 	while self:match_all_except_newline(self:peek(2)) do
 		self:increment()
 	end
-	return self:split('SHORT_COMMENT')
+
+	self:split('SHORT_COMMENT')
+	return true
 end
 
-function Lexer:tokenize_label()
-	self:increment(2) -- skip ::
+function Lexer:try_tokenize_label()
+	if self:peek_chain(2) ~= '::' or not self:match_identifier_start(self:peek(3)) then
+		return false
+	end
 
-	while self:match_label(self:peek(2)) do
+	-- skip '::'
+	self:increment() 
+	self:increment()
+
+	while self:match_label(self:peek()) do
 		self:increment()
 	end
-	self:increment()
 	
 	if self:peek_chain(2) ~= '::' then error('invalid label') end
 
 	self:increment()
-	return self:split('LABEL')
+	self:split('LABEL')
+	return true
 end
 
 function Lexer:match_whitespace(char)
@@ -306,9 +346,14 @@ function Lexer:match_decimal(char)
 	return char and char:match('[0-9]')
 end
 
-function Lexer:peek(x)
+function Lexer:peek(a)
+	if type(a) == 'string' then
+		if #a > 1 then error('can\'t peek more than 1 letter') end
+		return a == self.file:sub(self.cursor_end, self.cursor_end)
+	end
+
 	local peek_length = 0
-	if x then peek_length = x - 1 end
+	if a then peek_length = a - 1 end
 	if (self.cursor_end + peek_length) > #self.file then 
 		return false 
 	else
@@ -316,9 +361,9 @@ function Lexer:peek(x)
 	end
 end
 
-function Lexer:peek_chain(x)
+function Lexer:peek_chain(a)
 	local peek_length = 0
-	if x then peek_length = x - 1 end
+	if a then peek_length = a - 1 end
 	if (self.cursor_end + peek_length) > #self.file then 
 		return false 
 	else
@@ -326,28 +371,21 @@ function Lexer:peek_chain(x)
 	end
 end
 
-function Lexer:increment(x)
-	local increment_length = 0
-	if x then increment_length = x - 1 end
-	
-	self.cursor_end = self.cursor_end + 1 + increment_length
-	return not self:eof(x)
+function Lexer:increment()
+	self.cursor_end = self.cursor_end + 1
 end
 
-function Lexer:eof(x)
-	local eof_length = 0
-	if x then eof_length = x - 1 end
-	return (self.cursor_end + eof_length) > #self.file
+function Lexer:eof()
+	return self.cursor_end > #self.file
 end
 
 function Lexer:split(type)
-	local token = self.file:sub(self.cursor_start, self.cursor_end)
-
+	table.insert(self.tokens, {
+		type  = type, 
+		token = self.file:sub(self.cursor_start, self.cursor_end)
+	})
 	self:increment()
 	self.cursor_start = self.cursor_end
-	
-	table.insert(self.tokens, {type = type, token = token})
-	return token
 end
 
 function Lexer:get_current_token()
