@@ -55,6 +55,7 @@ function Lexer:try_identifier()
 	if	token == 'true'     then self:add_token('TRUE')     return true end
 	if	token == 'false'    then self:add_token('FALSE')    return true end
 	if	token == 'nil'      then self:add_token('NIL')      return true end
+	if token == 'math.pi'  then self:add_token('NUMBER')   return true end -- math.pi
 	if	token == 'fn'       then self:add_token('FN')       return true end -- custom
 	if	token == 'ifor'     then self:add_token('IFOR')     return true end -- custom
 	if	token == 'rfor'     then self:add_token('RFOR')     return true end -- custom
@@ -63,6 +64,7 @@ function Lexer:try_identifier()
 	if	token == 'case'     then self:add_token('CASE')     return true end -- custom
 	if	token == 'continue' then self:add_token('CONTINUE') return true end -- custom
 	if	token == 'through'  then self:add_token('THROUGH')  return true end -- custom
+	
 
 	self:add_token('IDENTIFIER')
 	return true
@@ -377,7 +379,7 @@ function Lexer:match_quote(char)
 end
 
 function Lexer:match_number(char)
-	return char and char:match('[xXpi%-%x%.]')
+	return char and char:match('[%-%x%.xX+-]')
 end
 
 function Lexer:match_decimal(char)
