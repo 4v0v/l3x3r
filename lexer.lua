@@ -153,7 +153,7 @@ function Lexer:try_short_comment()
 		return false
 	end
 
-	while self:match_all_except_newline(self:peek_next()) do
+	while not self:match_newline(self:peek_next()) do
 		self:next()
 	end
 
@@ -273,7 +273,7 @@ function Lexer:try_long_comment()
 				break
 			else 
 				-- it's a short comment
-				while self:match_all_except_newline(self:peek_next()) do
+				while not self:match_newline(self:peek_next()) do
 					self:next()
 				end
 
@@ -353,11 +353,11 @@ function Lexer:get_current_token()
 end
 
 function Lexer:match_whitespace(char)
-	return char and char:match('[\t ]')
+	return char and char:match('[\t\x20]')
 end
 
-function Lexer:match_all_except_newline(char)
-	return char and char:match('[^\n\r]')
+function Lexer:match_newline(char)
+	return char and char:match('[\n\r]')
 end
 
 function Lexer:match_identifier_start(char)
@@ -377,11 +377,11 @@ function Lexer:match_quote(char)
 end
 
 function Lexer:match_number(char)
-	return char and char:match('[0-9xXp%.i%-a-fA-F]')
+	return char and char:match('[xXpi%-%x%.]')
 end
 
 function Lexer:match_decimal(char)
-	return char and char:match('[0-9]')
+	return char and char:match('[%d]')
 end
 
 return Lexer
