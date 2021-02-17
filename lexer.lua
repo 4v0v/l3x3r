@@ -28,8 +28,8 @@ function Lexer:add_token(type, value)
 	table.insert(self.tokens, {
 		type      = type, 
 		value     = value or self:get_current_token(),
-		start_pos = self.cursor_start  
-		end_pos   = self.cursor_end  
+		start_pos = self.cursor_start,
+		end_pos   = self.cursor_end,
 	})
 
 	self:next()
@@ -76,6 +76,10 @@ function Lexer:try_identifier()
 	end
 
 	local token = self:get_current_token()
+	if	token == 'fn'       then self:add_token('FUNCTION', 'function') return true end -- custom
+	if	token == 'elif'     then self:add_token('ELSEIF', 'elseif')     return true end -- custom
+	if	token == 'rfor'     then self:add_token('RFOR', 'for')          return true end -- custom
+	if	token == 'ifor'     then self:add_token('IFOR', 'for')          return true end -- custom
 	if token == 'if'       then self:add_token('IF')       return true end
 	if	token == 'then'     then self:add_token('THEN')     return true end
 	if	token == 'else'     then self:add_token('ELSE')     return true end
@@ -99,18 +103,25 @@ function Lexer:try_identifier()
 	if	token == 'true'     then self:add_token('TRUE')     return true end
 	if	token == 'false'    then self:add_token('FALSE')    return true end
 	if	token == 'nil'      then self:add_token('NIL')      return true end
-	if	token == 'fn'       then self:add_token('FUNCTION', 'function') return true end -- custom
-	if	token == 'elif'     then self:add_token('ELSEIF', 'elseif')     return true end -- custom
-	if	token == 'rfor'     then self:add_token('RFOR', 'for')          return true end -- custom
-	if	token == 'ifor'     then self:add_token('IFOR', 'for')          return true end -- custom
 
 	self:add_token('IDENTIFIER')
 	return true
 end
 
 function Lexer:try_symbol()
+	if self:peek('..=') then self:next(2) self:add_token('..=')                 return true end -- custom
+	if self:peek('+=')  then self:next()  self:add_token('+=')                  return true end -- custom
+	if self:peek('-=')  then self:next()  self:add_token('-=')                  return true end -- custom
+	if self:peek('*=')  then self:next()  self:add_token('*=')                  return true end -- custom
+	if self:peek('/=')  then self:next()  self:add_token('/=')                  return true end -- custom
+	if self:peek('%=')  then self:next()  self:add_token('%=')                  return true end -- custom
+	if self:peek('++')  then self:next()  self:add_token('++')                  return true end -- custom
+	if self:peek('&&')  then self:next()  self:add_token('AND' , '\x20and\x20') return true end -- custom
+	if self:peek('||')  then self:next()  self:add_token('OR'  , '\x20or\x20')  return true end -- custom
+	if self:peek('!=')  then self:next()  self:add_token('~='  , '~=')          return true end -- custom
+	if self:peek('@')   then              self:add_token('SELF', 'self')        return true end -- custom
+	if self:peek('!')   then              self:add_token('NOT' , '\x20not\x20') return true end -- custom
 	if self:peek('...') then self:next(2) self:add_token('...')  return true end
-	if self:peek('..=') then self:next(2) self:add_token('..=')  return true end -- custom
 	if self:peek('==')  then self:next()  self:add_token('==')   return true end
 	if self:peek('>=')  then self:next()  self:add_token('>=')   return true end
 	if self:peek('<=')  then self:next()  self:add_token('<=')   return true end
@@ -118,15 +129,6 @@ function Lexer:try_symbol()
 	if self:peek('..')  then self:next()  self:add_token('..')   return true end
 	if self:peek('>>')  then self:next()  self:add_token('>>')   return true end
 	if self:peek('<<')  then self:next()  self:add_token('<<')   return true end
-	if self:peek('+=')  then self:next()  self:add_token('+=')   return true end -- custom
-	if self:peek('-=')  then self:next()  self:add_token('-=')   return true end -- custom
-	if self:peek('*=')  then self:next()  self:add_token('*=')   return true end -- custom
-	if self:peek('/=')  then self:next()  self:add_token('/=')   return true end -- custom
-	if self:peek('%=')  then self:next()  self:add_token('%=')   return true end -- custom
-	if self:peek('++')  then self:next()  self:add_token('++')   return true end -- custom
-	if self:peek('&&')  then self:next()  self:add_token('AND', '\x20and\x20') return true end -- custom
-	if self:peek('||')  then self:next()  self:add_token('OR', '\x20or\x20')   return true end -- custom
-	if self:peek('!=')  then self:next()  self:add_token('~=', '~=')           return true end -- custom
 	if self:peek('[')   then              self:add_token('[')    return true end
 	if self:peek(']')   then              self:add_token(']')    return true end
 	if self:peek('(')   then              self:add_token('(')    return true end
@@ -149,9 +151,6 @@ function Lexer:try_symbol()
 	if self:peek('#')   then              self:add_token('#')    return true end
 	if self:peek('&')   then              self:add_token('&')    return true end
 	if self:peek('.')   then              self:add_token('.')    return true end
-	if self:peek('@')   then              self:add_token('SELF', 'self')       return true end -- custom
-	if self:peek('!')   then              self:add_token('NOT', '\x20not\x20') return true end -- custom
-	
 	return false 
 end
 
