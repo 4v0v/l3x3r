@@ -22,6 +22,50 @@ function Lexer:tokenize(file)
 	return self.tokens
 end
 
+
+function Lexer:add_token(type, value)
+
+	table.insert(self.tokens, {
+		type      = type, 
+		value     = value or self:get_current_token(),
+		start_pos = self.cursor_start  
+		end_pos   = self.cursor_end  
+	})
+
+	self:next()
+	self.cursor_start = self.cursor_end
+end
+
+function Lexer:peek(string)
+	if string then
+		return string == self.file:sub(self.cursor_end, self.cursor_end + #string - 1)
+	end
+
+	if self.cursor_end > #self.file then 
+		return false 
+	else
+		return self.file:sub(self.cursor_end, self.cursor_end)
+	end
+end
+
+function Lexer:peek_next(number)
+	local char_pos = self.cursor_end + (number or 1)
+
+	if char_pos > #self.file then 
+		return false 
+	else
+		return self.file:sub(char_pos, char_pos)
+	end
+end
+
+function Lexer:next(number)
+	self.cursor_end = self.cursor_end + (number or 1)
+end
+
+function Lexer:eof()
+	return self.cursor_end > #self.file
+end
+
 function Lexer:try_identifier()
 	if not self:match_identifier_start(self:peek()) then 
 		return false
@@ -55,67 +99,58 @@ function Lexer:try_identifier()
 	if	token == 'true'     then self:add_token('TRUE')     return true end
 	if	token == 'false'    then self:add_token('FALSE')    return true end
 	if	token == 'nil'      then self:add_token('NIL')      return true end
-	if token == 'math.pi'  then self:add_token('NUMBER')   return true end -- math.pi
-	if	token == 'fn'       then self:add_token('FN')       return true end -- custom
-	if	token == 'ifor'     then self:add_token('IFOR')     return true end -- custom
-	if	token == 'rfor'     then self:add_token('RFOR')     return true end -- custom
-	if	token == 'elif'     then self:add_token('ELIF')     return true end -- custom
-	if	token == 'switch'   then self:add_token('SWITCH')   return true end -- custom
-	if	token == 'case'     then self:add_token('CASE')     return true end -- custom
-	if	token == 'continue' then self:add_token('CONTINUE') return true end -- custom
-	if	token == 'through'  then self:add_token('THROUGH')  return true end -- custom
-	
+	if	token == 'fn'       then self:add_token('FUNCTION', 'function') return true end -- custom
+	if	token == 'elif'     then self:add_token('ELSEIF', 'elseif')     return true end -- custom
+	if	token == 'rfor'     then self:add_token('RFOR', 'for')          return true end -- custom
+	if	token == 'ifor'     then self:add_token('IFOR', 'for')          return true end -- custom
 
 	self:add_token('IDENTIFIER')
 	return true
 end
 
 function Lexer:try_symbol()
-	if self:peek('...') then self:next(2) self:add_token('...') return true end
-	if self:peek('..=') then self:next(2) self:add_token('..=') return true end -- custom
-	if self:peek('==')  then self:next()  self:add_token('==')  return true end
-	if self:peek('>=')  then self:next()  self:add_token('>=')  return true end
-	if self:peek('<=')  then self:next()  self:add_token('<=')  return true end
-	if self:peek('~=')  then self:next()  self:add_token('~=')  return true end
-	if self:peek('..')  then self:next()  self:add_token('..')  return true end
-	if self:peek('>>')  then self:next()  self:add_token('>>')  return true end
-	if self:peek('<<')  then self:next()  self:add_token('<<')  return true end
-	if self:peek('::')  then self:next()  self:add_token('::')  return true end
-	if self:peek('+=')  then self:next()  self:add_token('+=')  return true end -- custom
-	if self:peek('-=')  then self:next()  self:add_token('-=')  return true end -- custom
-	if self:peek('!=')  then self:next()  self:add_token('!=')  return true end -- custom
-	if self:peek('*=')  then self:next()  self:add_token('*=')  return true end -- custom
-	if self:peek('/=')  then self:next()  self:add_token('/=')  return true end -- custom
-	if self:peek('%=')  then self:next()  self:add_token('%=')  return true end -- custom
-	if self:peek('++')  then self:next()  self:add_token('++')  return true end -- custom
-	if self:peek('&&')  then self:next()  self:add_token('&&')  return true end -- custom
-	if self:peek('||')  then self:next()  self:add_token('||')  return true end -- custom
-	if self:peek('[')   then              self:add_token('[')   return true end
-	if self:peek(']')   then              self:add_token(']')   return true end
-	if self:peek('(')   then              self:add_token('(')   return true end
-	if self:peek(')')   then              self:add_token(')')   return true end
-	if self:peek('{')   then              self:add_token('{')   return true end
-	if self:peek('}')   then              self:add_token('}')   return true end
-	if self:peek('>')   then              self:add_token('>')   return true end
-	if self:peek('<')   then              self:add_token('<')   return true end
-	if self:peek('=')   then              self:add_token('=')   return true end
-	if self:peek('%')   then              self:add_token('%')   return true end
-	if self:peek('?')   then              self:add_token('?')   return true end
-	if self:peek(':')   then              self:add_token(':')   return true end
-	if self:peek(';')   then              self:add_token(';')   return true end
-	if self:peek(',')   then              self:add_token(',')   return true end
-	if self:peek('+')   then              self:add_token('+')   return true end
-	if self:peek('-')   then              self:add_token('-')   return true end
-	if self:peek('*')   then              self:add_token('*')   return true end
-	if self:peek('/')   then              self:add_token('/')   return true end
-	if self:peek('^')   then              self:add_token('^')   return true end
-	if self:peek('#')   then              self:add_token('#')   return true end
-	if self:peek('&')   then              self:add_token('&')   return true end
-	if self:peek('.')   then              self:add_token('.')   return true end
-	if self:peek('@')   then              self:add_token('@')   return true end -- custom
-	if self:peek('!')   then              self:add_token('!')   return true end -- custom
-	if self:peek('\n')  then              self:add_token('eol') return true end
-	if self:peek('\r')  then              self:add_token('rol') return true end       
+	if self:peek('...') then self:next(2) self:add_token('...')  return true end
+	if self:peek('..=') then self:next(2) self:add_token('..=')  return true end -- custom
+	if self:peek('==')  then self:next()  self:add_token('==')   return true end
+	if self:peek('>=')  then self:next()  self:add_token('>=')   return true end
+	if self:peek('<=')  then self:next()  self:add_token('<=')   return true end
+	if self:peek('~=')  then self:next()  self:add_token('~=')   return true end
+	if self:peek('..')  then self:next()  self:add_token('..')   return true end
+	if self:peek('>>')  then self:next()  self:add_token('>>')   return true end
+	if self:peek('<<')  then self:next()  self:add_token('<<')   return true end
+	if self:peek('+=')  then self:next()  self:add_token('+=')   return true end -- custom
+	if self:peek('-=')  then self:next()  self:add_token('-=')   return true end -- custom
+	if self:peek('*=')  then self:next()  self:add_token('*=')   return true end -- custom
+	if self:peek('/=')  then self:next()  self:add_token('/=')   return true end -- custom
+	if self:peek('%=')  then self:next()  self:add_token('%=')   return true end -- custom
+	if self:peek('++')  then self:next()  self:add_token('++')   return true end -- custom
+	if self:peek('&&')  then self:next()  self:add_token('AND', '\x20and\x20') return true end -- custom
+	if self:peek('||')  then self:next()  self:add_token('OR', '\x20or\x20')   return true end -- custom
+	if self:peek('!=')  then self:next()  self:add_token('~=', '~=')           return true end -- custom
+	if self:peek('[')   then              self:add_token('[')    return true end
+	if self:peek(']')   then              self:add_token(']')    return true end
+	if self:peek('(')   then              self:add_token('(')    return true end
+	if self:peek(')')   then              self:add_token(')')    return true end
+	if self:peek('{')   then              self:add_token('{')    return true end
+	if self:peek('}')   then              self:add_token('}')    return true end
+	if self:peek('>')   then              self:add_token('>')    return true end
+	if self:peek('<')   then              self:add_token('<')    return true end
+	if self:peek('=')   then              self:add_token('=')    return true end
+	if self:peek('%')   then              self:add_token('%')    return true end
+	if self:peek('?')   then              self:add_token('?')    return true end
+	if self:peek(':')   then              self:add_token(':')    return true end
+	if self:peek(';')   then              self:add_token(';')    return true end
+	if self:peek(',')   then              self:add_token(',')    return true end
+	if self:peek('+')   then              self:add_token('+')    return true end
+	if self:peek('-')   then              self:add_token('-')    return true end
+	if self:peek('*')   then              self:add_token('*')    return true end
+	if self:peek('/')   then              self:add_token('/')    return true end
+	if self:peek('^')   then              self:add_token('^')    return true end
+	if self:peek('#')   then              self:add_token('#')    return true end
+	if self:peek('&')   then              self:add_token('&')    return true end
+	if self:peek('.')   then              self:add_token('.')    return true end
+	if self:peek('@')   then              self:add_token('SELF', 'self')       return true end -- custom
+	if self:peek('!')   then              self:add_token('NOT', '\x20not\x20') return true end -- custom
 	
 	return false 
 end
@@ -129,7 +164,7 @@ function Lexer:try_whitespace()
 		self:next()
 	end
 
-	self:add_token('wsp')
+	self:add_token('WHITESPACE')
 	return true
 end
 
@@ -159,7 +194,7 @@ function Lexer:try_short_comment()
 		self:next()
 	end
 
-	self:add_token('SHORT_COMMENT')
+	self:add_token('COMMENT')
 	return true
 end
 
@@ -171,7 +206,7 @@ function Lexer:try_label()
 	-- skip '::'
 	self:next(2)
 
-	while self:match_label(self:peek()) do
+	while self:match_identifier(self:peek()) do
 		self:next()
 	end
 	
@@ -201,7 +236,7 @@ function Lexer:try_short_string()
 		elseif self:peek([[\]] .. quote) then self:next(2) end
 
 		if self:peek(quote) then 
-			self:add_token('S_STRING') 
+			self:add_token('STRING') 
 			return true 
 		end
 	end
@@ -247,7 +282,7 @@ function Lexer:try_long_string()
 
 			if self:peek_next() == ']' then
 				self:next()
-				self:add_token('LONG_STRING') 
+				self:add_token('STRING') 
 				return true
 			end
 
@@ -279,7 +314,7 @@ function Lexer:try_long_comment()
 					self:next()
 				end
 
-				self:add_token('SHORT_COMMENT') 
+				self:add_token('COMMENT') 
 				return true
 			end
 		end
@@ -302,7 +337,7 @@ function Lexer:try_long_comment()
 
 			if self:peek_next() == ']' then
 				self:next()
-				self:add_token('LONG_COMMENT') 
+				self:add_token('COMMENT') 
 				return true
 			end
 
@@ -311,67 +346,24 @@ function Lexer:try_long_comment()
 	end
 end
 
-function Lexer:peek(string)
-	if string then
-		return string == self.file:sub(self.cursor_end, self.cursor_end + #string -1)
-	end
-
-	if self.cursor_end > #self.file then 
-		return false 
-	else
-		return self.file:sub(self.cursor_end, self.cursor_end)
-	end
-end
-
-function Lexer:peek_next(number)
-	local char_pos = self.cursor_end + (number or 1)
-
-	if char_pos > #self.file then 
-		return false 
-	else
-		return self.file:sub(char_pos, char_pos)
-	end
-end
-
-function Lexer:next(number)
-	self.cursor_end = self.cursor_end + (number or 1)
-end
-
-function Lexer:eof()
-	return self.cursor_end > #self.file
-end
-
-function Lexer:add_token(type)
-	table.insert(self.tokens, {
-		type  = type, 
-		token = self.file:sub(self.cursor_start, self.cursor_end)
-	})
-	self:next()
-	self.cursor_start = self.cursor_end
-end
-
 function Lexer:get_current_token()
 	return self.file:sub(self.cursor_start, self.cursor_end)
 end
 
 function Lexer:match_whitespace(char)
-	return char and char:match('[\t\x20]')
+	return char and char:match('[\n\t\x20]')
 end
 
 function Lexer:match_newline(char)
-	return char and char:match('[\n\r]')
+	return char and char:match('[\n]')
 end
 
 function Lexer:match_identifier_start(char)
 	return char and char:match('[%a_]')
 end
 
-function Lexer:match_label(char)
-	return char and char:match('[%w_]')
-end
-
 function Lexer:match_identifier(char)
-	return char and char:match('[%w_%.:]')
+	return char and char:match('[%w_]')
 end
 
 function Lexer:match_quote(char)
