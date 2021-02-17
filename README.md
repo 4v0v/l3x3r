@@ -1,15 +1,18 @@
 # p4rs3r
 
-Parser project for Lua 5.1 without any depedency.
+Lua Parser / Transpiler / Generator project for  without any depedency.
 
 The parser has multiple phases, for now : 
 
-1/ Lexer:       file string   -> tokens
-2/ Preparser:   tokens        -> better tokens
-3/ Parser:      better tokens -> ast
-4/ Stringifier: ast           -> new file string
-?/ Validator
+1/ Lexer:       lua w/ custom syntax -> tokens
+2/ Preparser:   tokens               -> better tokens
+3/ Parser:      better tokens        -> ast
+4/ Transformer: ast                  -> lua 5.1 ast
 
+Validator ?
+
+
+It will follow the AST like https://github.com/andremm/lua-parser
 
 The idea is also to try to make some custom syntax like switch statement, ternary operator, += ...
 
