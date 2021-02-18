@@ -23,6 +23,49 @@ end
 
 function Preparser:parse_for_loops()
 	while not self:eot() do
+
+		if self:peek('FOR') then
+			if self:peek_next_type_no_ws()  == 'IDENTIFIER' and
+				self:peek_next_type_no_ws(2) == 'DO'
+			then
+				local _, id_pos = self:peek_next_type_no_ws()
+				local _, do_pos = self:peek_next_type_no_ws(2)
+
+				for i = self.cursor, do_pos do
+					table.remove(self.tokens, self.cursor)
+				end
+					
+
+				table.insert(self.tokens, self.cursor, {type = "DO"        , value = "do"})
+				table.insert(self.tokens, self.cursor, {type = "WHITESPACE", value = "\x20"})
+				table.insert(self.tokens, self.cursor, {type = ")"         , value = ")"})
+				table.insert(self.tokens, self.cursor, {type = "IDENTIFIER", value = self:get_token_at(id_pos).value})
+				table.insert(self.tokens, self.cursor, {type = "("         , value = "("})
+				table.insert(self.tokens, self.cursor, {type = "IDENTIFIER", value = "pairs"})
+				table.insert(self.tokens, self.cursor, {type = "WHITESPACE", value = "\x20"})
+				table.insert(self.tokens, self.cursor, {type = "IN"        , value = "in"})
+				table.insert(self.tokens, self.cursor, {type = "WHITESPACE", value = "\x20"})
+				table.insert(self.tokens, self.cursor, {type = "IDENTIFIER", value = "it"})
+				table.insert(self.tokens, self.cursor, {type = "WHITESPACE", value = "\x20"})
+				table.insert(self.tokens, self.cursor, {type = ","         , value = ","})
+				table.insert(self.tokens, self.cursor, {type = "IDENTIFIER", value = "key"})
+				table.insert(self.tokens, self.cursor, {type = "WHITESPACE", value = "\x20"})
+				table.insert(self.tokens, self.cursor, {type = "FOR"       , value = "for"})
+
+			end
+		end
+
+
+
+		if self:peek('IFOR') then
+
+		end
+
+
+		if self:peek('RFOR') then
+
+		end
+
 		self:next()
 	end
 	self.cursor = 1
