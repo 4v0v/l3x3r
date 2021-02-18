@@ -10,7 +10,39 @@ function Preparser:preparse(tokens)
 	self:parse_for_loops()
 	self:parse_compound_assignment_operators()
 
+	self:parse_functions()
+
 	return self.tokens
+end
+
+function Preparser:parse_functions()
+	while not self:eot() do
+		self:find_recursive_block_end()
+	end
+	self.cursor = 1
+end
+
+
+function Preparser:find_recursive_block_end()
+	if self:peek('FUNCTION') or self:peek('DO') or self:peek('IF') then
+		local block_start = self.cursor
+
+		self:next()
+
+		while not self:eot() do
+			if self:peek('END') then 
+				local block_end = self.cursor
+				print('block start at: '.. block_start .. ' and close at: ' .. block_end)
+				return
+			end
+			
+			self:find_recursive_block_end()
+		end
+
+		error('CANT FIND END IN BLOC THAT START AT ' .. block_start)
+	end
+
+	self:next()
 end
 
 
