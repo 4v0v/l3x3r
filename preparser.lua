@@ -1,112 +1,80 @@
-
-function recursive_print (tbl, indent)
-	if not indent then indent = 0 end
-	for k, v in pairs(tbl) do
-	  formatting = string.rep("   ", indent) .. k .. ": "
-	  if type(v) == "table" then
-			local is_empty = true
-			for k2, v2 in pairs(v) do
-				is_empty = false
-				break
-			end
-
-			if is_empty then
-				print(formatting .. '{}')
-			else
-				 print(formatting .. '{')
-				recursive_print(v, indent+1)
-				print(string.rep("   ", indent) .. '}')
-			end
-	  else
-		 print(formatting .. tostring(v))
-	  end
-	end
- end
-
-
-
 local Preparser = {}
 
-local OPERATORS_UNARY = {
+Preparser.OPERATORS_UNARY = {
 	["-"]=true, ["NOT"]=true, ["#"]=true
 }
-local OPERATORS_BINARY = {
-	["+"]=true,   ["-"]=true,  ["*"]=true, ["/"]=true, ["^"]=true,  ["%"]=true, [".."]=true,
-	["<"]=true,   ["<="]=true, [">"]=true, [">="]=true, ["=="]=true, ["~="]=true,
+Preparser.OPERATORS_BINARY = {
+	["+"]=true, ["-"]=true, ["*"]=true, ["/"]=true, ["^"]=true, ["%"]=true, [".."]=true,
+	["<"]=true, ["<="]=true, [">"]=true, [">="]=true, ["=="]=true, ["~="]=true,
 	["AND"]=true, ["OR"]=true,
 }
-local OPERATORS_COMPOUND = {
-	["+="]=true,   ["-="]=true,  ["*="]=true, ["/="]=true, ["^="]=true,  ["%="]=true, ["..="]=true,
+Preparser.OPERATORS_COMPOUND = {
+	["+="]=true, ["-="]=true, ["*="]=true, ["/="]=true, ["^="]=true, ["%="]=true, ["..="]=true,
 }
-
 
 function Preparser:preparse(tokens)
 	self.tokens = tokens
 	self.cursor = 1
 
-	-- do stuff on tokens that don't need ast for now
 	self:merge_identifiers()
-	self:parse_increment()
 	self:parse_for_loops()
 	self:parse_compound_assignment_operators()
-
-	self:parse_blocks()
 
 	return self.tokens
 end
 
-function Preparser:parse_blocks()
-	while not self:eot() do
-		local blocs = self:find_recursive_block()
-
-		if blocs and #blocs > 0 then
-			recursive_print(blocs[1])
-		end
-	end
-	self.cursor = 1
-end
-
-
 function Preparser:parse_compound_assignment_operators()
 	while not self:eot() do
-		if self:peek('IDENTIFIER') and OPERATORS_COMPOUND[self:peek_next_type_no_ws()] then
+		if self:peek('IDENTIFIER') and self.OPERATORS_COMPOUND[self:peek_next_type()] then
 
 			local assigned_identifier = self:peek().value
-			local _, compound_pos     = self:peek_next_type_no_ws()
+			local _, compound_pos     = self:peek_next_type()
 			local compound_operator   = self:get_token_at(compound_pos).value:sub(1, 1)
 			local assignment_start    = compound_pos + 1
 
 			self.cursor = compound_pos -- enter inside assignment
+
 			while true do
 				-- skip unary operators
-				while 
-					OPERATORS_UNARY[self:peek_next_type_no_ws()]
-				do
-					local _, pos = self:peek_next_type_no_ws()
+				while self.OPERATORS_UNARY[self:peek_next_type()] do
+					local _, pos = self:peek_next_type()
 					self.cursor  = pos 
 				end
 
 				-- parse component of the assigment
-				if self:peek_next_type_no_ws() == 'IDENTIFIER' or
-					self:peek_next_type_no_ws() == 'NUMBER' 
-					-- TODO: recursive blocks
+				if self:peek_next_type() == 'IDENTIFIER' or
+					self:peek_next_type() == 'NUMBER' 	  or
+					self:peek_next_type() == '(' 			  or 
+					self:peek_next_type() == '{' 
 				then
-					local _, pos = self:peek_next_type_no_ws()
-					self.cursor  = pos -- identifier
+					if self:peek_next_type() == '(' or 
+						self:peek_next_type() == '{' 
+					then
+						local _, pos = self:peek_next_type()
+						self.cursor  = pos -- go to opening of block
+
+						local block = self:find_recursive_block()
+						self.cursor = block.block_end
+					else
+						local _, pos = self:peek_next_type()
+						self.cursor  = pos -- identifier
+					end
 				else
 					error("INVALID ASSIGMENT")
 				end
 
 				-- parse call if component is a function call
-				if self:peek_next_type_no_ws() == '(' then
-					
-					local _, pos = self:peek_next_type_no_ws()
-					self.cursor  = pos -- end of call
+				if self:peek_next_type() == '(' then
+					local _, pos = self:peek_next_type()
+					self.cursor  = pos
+
+					local block = self:find_recursive_block()
+					self.cursor = block.block_end
 				end
 
 				-- parse operator
-				if OPERATORS_BINARY[self:peek_next_type_no_ws()] then
-					local _, pos = self:peek_next_type_no_ws()
+				if self.OPERATORS_BINARY[self:peek_next_type()] then
+					local _, pos = self:peek_next_type()
 					self.cursor  = pos
 				else
 					break -- end of assigment
@@ -131,7 +99,6 @@ function Preparser:parse_compound_assignment_operators()
 			self.tokens[compound_pos].value = '='
 		end
 
-
 		self:next()
 	end
 	self.cursor = 1
@@ -139,7 +106,7 @@ end
 
 
 function Preparser:find_recursive_block(recursive_block)
-	if not recursive_block then recursive_block = {} end
+	if not recursive_bloc then recursive_block = {} end
 	if self:peek('FUNCTION') or self:peek('DO') or self:peek('IF') or self:peek('{') or self:peek('(') then
 
 		local type = self:peek().type
@@ -157,20 +124,22 @@ function Preparser:find_recursive_block(recursive_block)
 			block_start = self.cursor
 		}
 
-		-- move in block body
-		self:next()
+		self:next() -- move in block body
 
 		while not self:eot() do
-
 			if block.block_type == 'TABLE'       and self:peek('}') or
 				block.block_type == 'PARENTHESIS' and self:peek(')') or
 				self:peek('END') 
 			then
 				block.block_end = self.cursor
-				table.insert(recursive_block, block)
-
 				self:next()
-				return recursive_block
+
+				if not recursive_block then
+					table.insert(recursive_block, block)
+					return recursive_block
+				else
+					return block
+				end
 			end
 				
 			self:find_recursive_block(block.blocks)
@@ -186,17 +155,16 @@ function Preparser:parse_for_loops()
 	while not self:eot() do
 
 		if self:peek('FOR') then
-			if self:peek_next_type_no_ws()  == 'IDENTIFIER' and
-				self:peek_next_type_no_ws(2) == 'DO'
+			if self:peek_next_type()  == 'IDENTIFIER' and
+				self:peek_next_type(2) == 'DO'
 			then
-				local _, id_pos = self:peek_next_type_no_ws()
-				local _, do_pos = self:peek_next_type_no_ws(2)
+				local _, id_pos = self:peek_next_type()
+				local _, do_pos = self:peek_next_type(2)
 
 				for i = self.cursor, do_pos do
 					table.remove(self.tokens, self.cursor)
 				end
 					
-
 				table.insert(self.tokens, self.cursor, {type = "DO"        , value = "do"})
 				table.insert(self.tokens, self.cursor, {type = "WHITESPACE", value = "\x20"})
 				table.insert(self.tokens, self.cursor, {type = ")"         , value = ")"})
@@ -212,20 +180,11 @@ function Preparser:parse_for_loops()
 				table.insert(self.tokens, self.cursor, {type = "IDENTIFIER", value = "key"})
 				table.insert(self.tokens, self.cursor, {type = "WHITESPACE", value = "\x20"})
 				table.insert(self.tokens, self.cursor, {type = "FOR"       , value = "for"})
-
 			end
 		end
 
-
-
-		if self:peek('IFOR') then
-
-		end
-
-
-		if self:peek('RFOR') then
-
-		end
+		if self:peek('IFOR') then end
+		if self:peek('RFOR') then end
 
 		self:next()
 	end
@@ -238,27 +197,27 @@ function Preparser:merge_identifiers()
 			local id_start      = self.cursor
 			local need_to_merge = false
 
-			while self:peek_next_type_no_ws() == '.' or 
-					self:peek_next_type_no_ws() == ':' or
-					self:peek_next_type_no_ws() == '[' 
+			while self:peek_next_type() == '.' or 
+					self:peek_next_type() == ':' or
+					self:peek_next_type() == '[' 
 			do
-				if need_to_merge == false then
+				if not need_to_merge then
 					need_to_merge = true
 				end
 
-				if self:peek_next_type_no_ws() == '.' or 
-					self:peek_next_type_no_ws() == ':' 
+				if self:peek_next_type() == '.' or 
+					self:peek_next_type() == ':' 
 				then
-					local next_type, next_pos = self:peek_next_type_no_ws(2)
+					local next_type, next_pos = self:peek_next_type(2)
 					if next_type == 'IDENTIFIER' then
 						self.cursor = next_pos
 					else
 						error('BAD IDENTIFIER')
 					end
 
-				elseif self:peek_next_type_no_ws() == '[' then
-					local next_type            = self:peek_next_type_no_ws(2)
-					local next_type2, next_pos = self:peek_next_type_no_ws(3)
+				elseif self:peek_next_type() == '[' then
+					local next_type            = self:peek_next_type(2)
+					local next_type2, next_pos = self:peek_next_type(3)
 
 					if (next_type == 'STRING' or next_type == 'NUMBER') and next_type2 == ']' then
 						self.cursor = next_pos
@@ -285,27 +244,13 @@ function Preparser:merge_identifiers()
 	self.cursor = 1
 end
 
-function Preparser:parse_increment()
-	while not self:eot() do
-		if self:peek('IDENTIFIER') then
-			local next_token, next_pos = self:peek_next_no_ws()
-
-			if next_token and next_token.value == "++" then
-				local current_token = self:peek()
-
-				table.remove(self.tokens, next_pos) -- remove ++
-				table.insert(self.tokens, next_pos, {type = "NUMBER",     value = "1"})
-				table.insert(self.tokens, next_pos, {type = "+",          value = "+"})
-				table.insert(self.tokens, next_pos, {type = "IDENTIFIER", value = current_token.value})
-				table.insert(self.tokens, next_pos, {type = "=",          value = "="})
-			end
-		end
-
-		self:next()
+function Preparser:get_token_at(number)
+	if number > #self.tokens or number < 1 then 
+		return false
+	else
+		return self.tokens[number]
 	end
-	self.cursor = 1
 end
-
 
 function Preparser:next()
 	self.cursor = self.cursor + 1
@@ -318,19 +263,12 @@ end
 function Preparser:peek(type)
 	if type then
 		return type == self.tokens[self.cursor].type
-	end
-	return self.tokens[self.cursor]
-end
-
-function Preparser:get_token_at(number)
-	if number > #self.tokens or number < 1 then 
-		return false
 	else
-		return self.tokens[number]
+		return self.tokens[self.cursor]
 	end
 end
 
-function Preparser:peek_next(number)
+function Preparser:peek_next_with_whitespace(number)
 	local token_pos = self.cursor + (number or 1)
 	if token_pos > #self.tokens then 
 		return false
@@ -339,7 +277,8 @@ function Preparser:peek_next(number)
 	end
 end
 
-function Preparser:peek_next_no_ws(number)
+-- no whitespace
+function Preparser:peek_next(number)
 	local token_pos = self.cursor + 1
 	local count     = number or 1
 
@@ -356,8 +295,9 @@ function Preparser:peek_next_no_ws(number)
 	return false
 end
 
-function Preparser:peek_next_type_no_ws(number)
-	local token, pos = self:peek_next_no_ws(number)
+-- no whitespace
+function Preparser:peek_next_type(number)
+	local token, pos = self:peek_next(number)
 	if token then
 		return token.type, pos
 	else
