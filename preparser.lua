@@ -1,3 +1,4 @@
+
 function recursive_print (tbl, indent)
 	if not indent then indent = 0 end
 	for k, v in pairs(tbl) do
@@ -23,7 +24,21 @@ function recursive_print (tbl, indent)
  end
 
 
+
 local Preparser = {}
+
+local OPERATORS_UNARY = {
+	["-"]=true, ["NOT"]=true, ["#"]=true
+}
+local OPERATORS_BINARY = {
+	["+"]=true,   ["-"]=true,  ["*"]=true, ["/"]=true, ["^"]=true,  ["%"]=true, [".."]=true,
+	["<"]=true,   ["<="]=true, [">"]=true, [">="]=true, ["=="]=true, ["~="]=true,
+	["AND"]=true, ["OR"]=true,
+}
+local OPERATORS_COMPOUND = {
+	["+="]=true,   ["-="]=true,  ["*="]=true, ["/="]=true, ["^="]=true,  ["%="]=true, ["..="]=true,
+}
+
 
 function Preparser:preparse(tokens)
 	self.tokens = tokens
@@ -36,7 +51,6 @@ function Preparser:preparse(tokens)
 	self:parse_compound_assignment_operators()
 
 	self:parse_blocks()
-	-- self:parse_tables()
 
 	return self.tokens
 end
@@ -53,13 +67,86 @@ function Preparser:parse_blocks()
 end
 
 
+function Preparser:parse_compound_assignment_operators()
+	while not self:eot() do
+		if self:peek('IDENTIFIER') and OPERATORS_COMPOUND[self:peek_next_type_no_ws()] then
+
+			local assigned_identifier = self:peek().value
+			local _, compound_pos     = self:peek_next_type_no_ws()
+			local compound_operator   = self:get_token_at(compound_pos).value:sub(1, 1)
+			local assignment_start    = compound_pos + 1
+
+			self.cursor = compound_pos -- enter inside assignment
+			while true do
+				-- skip unary operators
+				while 
+					OPERATORS_UNARY[self:peek_next_type_no_ws()]
+				do
+					local _, pos = self:peek_next_type_no_ws()
+					self.cursor  = pos 
+				end
+
+				-- parse component of the assigment
+				if self:peek_next_type_no_ws() == 'IDENTIFIER' or
+					self:peek_next_type_no_ws() == 'NUMBER' 
+					-- TODO: recursive blocks
+				then
+					local _, pos = self:peek_next_type_no_ws()
+					self.cursor  = pos -- identifier
+				else
+					error("INVALID ASSIGMENT")
+				end
+
+				-- parse call if component is a function call
+				if self:peek_next_type_no_ws() == '(' then
+					
+					local _, pos = self:peek_next_type_no_ws()
+					self.cursor  = pos -- end of call
+				end
+
+				-- parse operator
+				if OPERATORS_BINARY[self:peek_next_type_no_ws()] then
+					local _, pos = self:peek_next_type_no_ws()
+					self.cursor  = pos
+				else
+					break -- end of assigment
+				end
+			end
+			local assignment_end = self.cursor
+
+
+			table.insert(self.tokens, assignment_end + 1, {type = ')', value = ')'})
+			table.insert(self.tokens, assignment_end + 1, {type = 'WHITESPACE', value = ' '})
+
+			table.insert(self.tokens, assignment_start, {type = '(', value = '('})
+			table.insert(self.tokens, assignment_start, {type = 'WHITESPACE', value = ' '})
+
+			table.insert(self.tokens, assignment_start, {type = compound_operator, value = compound_operator})
+			table.insert(self.tokens, assignment_start, {type = 'WHITESPACE', value = ' '})
+
+			table.insert(self.tokens, assignment_start, {type = 'IDENTIFIER', value = assigned_identifier})
+			table.insert(self.tokens, assignment_start, {type = 'WHITESPACE', value = ' '})
+
+			self.tokens[compound_pos].type  = '='
+			self.tokens[compound_pos].value = '='
+		end
+
+
+		self:next()
+	end
+	self.cursor = 1
+end
+
+
 function Preparser:find_recursive_block(recursive_block)
 	if not recursive_block then recursive_block = {} end
-	if self:peek('FUNCTION') or self:peek('DO') or self:peek('IF') or self:peek('{') then
+	if self:peek('FUNCTION') or self:peek('DO') or self:peek('IF') or self:peek('{') or self:peek('(') then
 
 		local type = self:peek().type
 		if self:peek('{') then 
 			type = 'TABLE' 
+		elseif  self:peek('(') then 
+			type = 'PARENTHESIS' 
 		else
 			type = self:peek().type
 		end
@@ -75,22 +162,15 @@ function Preparser:find_recursive_block(recursive_block)
 
 		while not self:eot() do
 
-			if block.block_type == 'TABLE' then
-				if self:peek('}') then
-					block.block_end = self.cursor
-					table.insert(recursive_block, block)
+			if block.block_type == 'TABLE'       and self:peek('}') or
+				block.block_type == 'PARENTHESIS' and self:peek(')') or
+				self:peek('END') 
+			then
+				block.block_end = self.cursor
+				table.insert(recursive_block, block)
 
-					self:next()
-					return recursive_block
-				end
-			else
-				if self:peek('END') then
-					block.block_end = self.cursor
-					table.insert(recursive_block, block)
-
-					self:next()
-					return recursive_block
-				end
+				self:next()
+				return recursive_block
 			end
 				
 			self:find_recursive_block(block.blocks)
@@ -100,54 +180,6 @@ function Preparser:find_recursive_block(recursive_block)
 	end
 
 	self:next()
-end
-
-
--- function Preparser:parse_tables()
--- 	while not self:eot() do
--- 		local tbls = self:find_recursive_table({})
-
--- 		if tbls and #tbls > 0 then
--- 			recursive_print(tbls)
--- 		end
--- 	end
--- 	self.cursor = 1
--- end
-
--- function Preparser:find_recursive_table(recursive_tbl)
--- 	if self:peek('{') then
-
--- 		local tbl = {{}, 'TABLE', self.cursor} --tbl start
-
--- 		-- move in tbl body
--- 		self:next()
-
--- 		while not self:eot() do
--- 			if self:peek('}') then
--- 				table.insert(tbl, self.cursor) -- tbl end
--- 				table.insert(recursive_tbl, tbl)
-
--- 				self:next()
--- 				return recursive_tbl
--- 			end
-			
--- 			self:find_recursive_table(tbl[1])
--- 		end
-
--- 		error('CANT FIND END IN BLOC THAT START AT ' .. tbl[2])
--- 	end
-
--- 	self:next()
--- end
-
-
-
-
-function Preparser:parse_compound_assignment_operators()
-	while not self:eot() do
-		self:next()
-	end
-	self.cursor = 1
 end
 
 function Preparser:parse_for_loops()
@@ -334,3 +366,4 @@ function Preparser:peek_next_type_no_ws(number)
 end
 
 return Preparser
+
