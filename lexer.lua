@@ -90,79 +90,75 @@ function Lexer:try_identifier()
 	if	token == 'elif'     then self:insert_token('ELSEIF'  , 'elseif')   return true end -- custom
 	if	token == 'rfor'     then self:insert_token('RFOR'    , 'for')      return true end -- custom
 	if	token == 'ifor'     then self:insert_token('IFOR'    , 'for')      return true end -- custom
-	if token == 'if'       then self:insert_token('IF')       return true end
-	if	token == 'then'     then self:insert_token('THEN')     return true end
-	if	token == 'else'     then self:insert_token('ELSE')     return true end
-	if	token == 'elseif'   then self:insert_token('ELSEIF')   return true end
-	if	token == 'end'      then self:insert_token('END')      return true end
-	if	token == 'do'       then self:insert_token('DO')       return true end
-	if	token == 'for'      then self:insert_token('FOR')      return true end
-	if	token == 'function' then self:insert_token('FUNCTION') return true end
-	if	token == 'repeat'   then self:insert_token('REPEAT')   return true end
-	if	token == 'until'    then self:insert_token('UNTIL')    return true end
-	if	token == 'while'    then self:insert_token('WHILE')    return true end
-	if	token == 'break'    then self:insert_token('BREAK')    return true end
-	if	token == 'return'   then self:insert_token('RETURN')   return true end
-	if	token == 'local'    then self:insert_token('LOCAL')    return true end
-	if	token == 'in'       then self:insert_token('IN')       return true end
-	if	token == 'not'      then self:insert_token('NOT')      return true end
-	if	token == 'and'      then self:insert_token('AND')      return true end
-	if	token == 'or'       then self:insert_token('OR')       return true end
-	if	token == 'goto'     then self:insert_token('GOTO')     return true end
-	if	token == 'self'     then self:insert_token('SELF')     return true end
-	if	token == 'true'     then self:insert_token('TRUE')     return true end
-	if	token == 'false'    then self:insert_token('FALSE')    return true end
-	if	token == 'nil'      then self:insert_token('NIL')      return true end
+	if token == 'if'       then self:insert_token('IF')                   return true end
+	if	token == 'then'     then self:insert_token('THEN')                 return true end
+	if	token == 'else'     then self:insert_token('ELSE')                 return true end
+	if	token == 'elseif'   then self:insert_token('ELSEIF')               return true end
+	if	token == 'end'      then self:insert_token('END')                  return true end
+	if	token == 'do'       then self:insert_token('DO')                   return true end
+	if	token == 'for'      then self:insert_token('FOR')                  return true end
+	if	token == 'function' then self:insert_token('FUNCTION')             return true end
+	if	token == 'repeat'   then self:insert_token('REPEAT')               return true end
+	if	token == 'until'    then self:insert_token('UNTIL')                return true end
+	if	token == 'while'    then self:insert_token('WHILE')                return true end
+	if	token == 'break'    then self:insert_token('BREAK')                return true end
+	if	token == 'return'   then self:insert_token('RETURN')               return true end
+	if	token == 'local'    then self:insert_token('LOCAL')                return true end
+	if	token == 'in'       then self:insert_token('IN')                   return true end
+	if	token == 'not'      then self:insert_token('NOT')                  return true end
+	if	token == 'and'      then self:insert_token('AND')                  return true end
+	if	token == 'or'       then self:insert_token('OR')                   return true end
+	if	token == 'goto'     then self:insert_token('GOTO')                 return true end
+	if	token == 'self'     then self:insert_token('IDENTIFIER')           return true end
+	if	token == 'true'     then self:insert_token('TRUE')                 return true end
+	if	token == 'false'    then self:insert_token('FALSE')                return true end
+	if	token == 'nil'      then self:insert_token('NIL')                  return true end
 
 	self:insert_token('IDENTIFIER')
 	return true
 end
 
 function Lexer:try_symbol()
-	if self:peek('..=') then self:next(2) self:insert_token('..=')                 return true end -- custom
-	if self:peek('+=')  then self:next()  self:insert_token('+=')                  return true end -- custom
-	if self:peek('-=')  then self:next()  self:insert_token('-=')                  return true end -- custom
-	if self:peek('*=')  then self:next()  self:insert_token('*=')                  return true end -- custom
-	if self:peek('/=')  then self:next()  self:insert_token('/=')                  return true end -- custom
-	if self:peek('%=')  then self:next()  self:insert_token('%=')                  return true end -- custom
-	if self:peek('++')  then self:next()  self:insert_token('++')                  return true end -- custom
-	if self:peek('&&')  then self:next()  self:insert_token('AND' , '\x20and\x20') return true end -- custom
-	if self:peek('||')  then self:next()  self:insert_token('OR'  , '\x20or\x20')  return true end -- custom
-	if self:peek('!=')  then self:next()  self:insert_token('~='  , '~=')          return true end -- custom
-	if self:peek('@')   then              self:insert_token('SELF', 'self')        return true end -- custom
-	if self:peek('!')   then              self:insert_token('NOT' , '\x20not\x20') return true end -- custom
-	if self:peek('...') then self:next(2) self:insert_token('...') return true end
-	if self:peek('==')  then self:next()  self:insert_token('==')  return true end
-	if self:peek('>=')  then self:next()  self:insert_token('>=')  return true end
-	if self:peek('<=')  then self:next()  self:insert_token('<=')  return true end
-	if self:peek('~=')  then self:next()  self:insert_token('~=')  return true end
-	if self:peek('//')  then self:next()  self:insert_token('//')  return true end
-	if self:peek('..')  then self:next()  self:insert_token('..')  return true end
-	if self:peek('>>')  then self:next()  self:insert_token('>>')  return true end
-	if self:peek('<<')  then self:next()  self:insert_token('<<')  return true end
-	if self:peek('[')   then              self:insert_token('[')   return true end
-	if self:peek(']')   then              self:insert_token(']')   return true end
-	if self:peek('(')   then              self:insert_token('(')   return true end
-	if self:peek(')')   then              self:insert_token(')')   return true end
-	if self:peek('{')   then              self:insert_token('{')   return true end
-	if self:peek('}')   then              self:insert_token('}')   return true end
-	if self:peek('>')   then              self:insert_token('>')   return true end
-	if self:peek('<')   then              self:insert_token('<')   return true end
-	if self:peek('=')   then              self:insert_token('=')   return true end
-	if self:peek('%')   then              self:insert_token('%')   return true end
-	if self:peek('?')   then              self:insert_token('?')   return true end
-	if self:peek(':')   then              self:insert_token(':')   return true end
-	if self:peek(';')   then              self:insert_token(';')   return true end
-	if self:peek(',')   then              self:insert_token(',')   return true end
-	if self:peek('+')   then              self:insert_token('+')   return true end
-	if self:peek('-')   then              self:insert_token('-')   return true end
-	if self:peek('*')   then              self:insert_token('*')   return true end
-	if self:peek('/')   then              self:insert_token('/')   return true end
-	if self:peek('^')   then              self:insert_token('^')   return true end
-	if self:peek('#')   then              self:insert_token('#')   return true end
-	if self:peek('&')   then              self:insert_token('&')   return true end
-	if self:peek('.')   then              self:insert_token('.')   return true end
-	return false 
+	if     self:peek('&&')  then self:next()  self:insert_token('AND'       , '\x20and\x20') -- custom
+	elseif self:peek('||')  then self:next()  self:insert_token('OR'        , '\x20or\x20')  -- custom
+	elseif self:peek('@')   then              self:insert_token('IDENTIFIER', 'self') -- custom
+	elseif self:peek('!')   then              self:insert_token('NOT'       , '\x20not\x20') -- custom
+	elseif self:peek('..=') then self:next(2) self:insert_token('..=') -- custom
+	elseif self:peek('+=')  then self:next()  self:insert_token('+=') -- custom
+	elseif self:peek('-=')  then self:next()  self:insert_token('-=') -- custom
+	elseif self:peek('*=')  then self:next()  self:insert_token('*=') -- custom
+	elseif self:peek('/=')  then self:next()  self:insert_token('/=') -- custom
+	elseif self:peek('%=')  then self:next()  self:insert_token('%=') -- custom
+	elseif self:peek('!=')  then self:next()  self:insert_token('~=') -- custom
+	elseif self:peek('==')  then self:next()  self:insert_token('==')
+	elseif self:peek('>=')  then self:next()  self:insert_token('>=')
+	elseif self:peek('<=')  then self:next()  self:insert_token('<=')
+	elseif self:peek('~=')  then self:next()  self:insert_token('~=')
+	elseif self:peek('...') then self:next(2) self:insert_token('...') -- '...' this must be before ''..''
+	elseif self:peek('..')  then self:next()  self:insert_token('..')  -- '...' this must be before ''..''
+	elseif self:peek('>')   then              self:insert_token('>')
+	elseif self:peek('<')   then              self:insert_token('<')
+	elseif self:peek('=')   then              self:insert_token('=')
+	elseif self:peek('[')   then              self:insert_token('[')
+	elseif self:peek(']')   then              self:insert_token(']')
+	elseif self:peek('(')   then              self:insert_token('(')
+	elseif self:peek(')')   then              self:insert_token(')')
+	elseif self:peek('{')   then              self:insert_token('{')
+	elseif self:peek('}')   then              self:insert_token('}')
+	elseif self:peek(':')   then              self:insert_token(':')
+	elseif self:peek('.')   then              self:insert_token('.')
+	elseif self:peek(';')   then              self:insert_token(';')
+	elseif self:peek(',')   then              self:insert_token(',')
+	elseif self:peek('%')   then              self:insert_token('%')
+	elseif self:peek('+')   then              self:insert_token('+')
+	elseif self:peek('-')   then              self:insert_token('-')
+	elseif self:peek('*')   then              self:insert_token('*')
+	elseif self:peek('/')   then              self:insert_token('/')
+	elseif self:peek('^')   then              self:insert_token('^')
+	elseif self:peek('#')   then              self:insert_token('#')
+	else return false end
+
+	return true 
 end
 
 function Lexer:try_whitespace()
@@ -380,8 +376,9 @@ function Lexer:match_quote(char)
 	return char and char:match('[\'"]')
 end
 
+-- TODO: 2+e00 scientific notation
 function Lexer:match_number(char)
-	return char and char:match('[%-%x%.xX+-]')
+	return char and char:match('[%-%x%.xX]')  
 end
 
 function Lexer:match_decimal(char)
